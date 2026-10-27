@@ -3,9 +3,9 @@ import { formatDateTime } from '@/shared/i18n/format';
 import { useTranslation } from 'react-i18next';
 import { i18n } from '@/shared/i18n';
 import { useState } from 'react';
-import { Card, Button, Space, Modal, Form, Input, message, Popconfirm } from 'antd';
+import { Card, Button, Space, Modal, Form, Input, message, Popconfirm, Tooltip } from 'antd';
 import { Table } from '@/shared/theme/ThemedTable';
-import { PlusOutlined, ShareAltOutlined, DeleteOutlined } from '@ant-design/icons';
+import { PlusOutlined, ShareAltOutlined, DeleteOutlined, CopyOutlined } from '@ant-design/icons';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createRepo, listRepos, deleteRepo } from './api';
@@ -14,6 +14,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { isValidRepoName, repoNameInvalidMessage } from './repoNameValidation';
 import { useAccessCommand } from '@/shared/auth/useAccessCommand';
 import { EllipsisText } from '@/shared/ui/EllipsisText';
+import { copyTextToClipboard } from '@/shared/lib/clipboard';
 
 const SCP_LIKE_SSH_REPO_PATTERN = /^[\w.-]+@[\w.-]+:[\w./~@-]+(?:\.git)?$/;
 const URL_REPO_PATTERN = /^(https?:\/\/|ssh:\/\/|git:\/\/).+/i;
@@ -86,6 +87,15 @@ export function RepoListPage() {
     });
   };
 
+  const handleCopyUrl = async (record: Repo) => {
+    const copied = await copyTextToClipboard(record.url);
+    if (copied) {
+      message.success(i18n.t('repo:feedback.urlCopied'));
+    } else {
+      message.error(i18n.t('repo:errors.copyUrlFailed'));
+    }
+  };
+
   const columns: ColumnsType<Repo> = [
     { title: t('fields.id'), dataIndex: 'id', width: 70 },
     {
@@ -96,7 +106,20 @@ export function RepoListPage() {
     },
     {
       title: t('fields.url'), dataIndex: 'url', align: 'left', width: 260, ellipsis: { showTitle: false },
-      render: (v: string) => <EllipsisText>{v}</EllipsisText>,
+      render: (v: string, record: Repo) => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
+          <EllipsisText style={{ flex: 1, minWidth: 0 }}>{v}</EllipsisText>
+          <Tooltip title={t('actions.copyUrl')}>
+            <Button
+              type="text"
+              size="small"
+              aria-label={t('actions.copyUrlLabel', { name: record.name })}
+              icon={<CopyOutlined aria-hidden="true" />}
+              onClick={() => void handleCopyUrl(record)}
+            />
+          </Tooltip>
+        </div>
+      ),
     },
     {
       title: t('fields.description'), dataIndex: 'description', align: 'left', width: 240, ellipsis: { showTitle: false },

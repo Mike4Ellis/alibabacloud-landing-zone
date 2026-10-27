@@ -33,6 +33,7 @@ it('updates the cached hub/list, open confirmation and create validation without
   await act(() => i18n.changeLanguage('en-US'));
   expect(screen.getByRole('heading', { name: 'Repositories' })).toBeInTheDocument();
   expect(screen.getByRole('tab', { name: 'Relationship map' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: `Copy the Git URL of repository “${repo.name}”` })).toBeInTheDocument();
   expect(screen.getByText(`Delete repository “${repo.name}”?`)).toBeInTheDocument();
   expect(screen.getByText(repo.description)).toBeInTheDocument();
   expect(screen.getAllByText('Created').length).toBeGreaterThan(0);
@@ -46,6 +47,7 @@ it('updates the cached hub/list, open confirmation and create validation without
   expect(await screen.findByText(/Repository name must be a single directory segment/)).toBeInTheDocument();
   await act(() => i18n.changeLanguage('zh-CN'));
   expect(await screen.findByText(/仓库名称必须为单级目录名/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: `复制仓库「${repo.name}」的 Git 地址` })).toBeInTheDocument();
   expect(screen.getByLabelText('仓库名称')).toBe(name);
   expect(screen.getByLabelText('仓库地址')).toBe(url);
   expect(name).toHaveValue('bad/name');
