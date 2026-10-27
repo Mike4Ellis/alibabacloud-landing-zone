@@ -39,7 +39,9 @@
     "editConclusionButton": "编辑结论",
     "deleteRepoLabel": "删除仓库 {{name}}",
     "clearBranch": "清除默认分支",
-    "clearDescription": "清除描述"
+    "clearDescription": "清除描述",
+    "copyUrl": "复制仓库地址",
+    "copyUrlLabel": "复制仓库「{{name}}」的 Git 地址"
   },
   "feedback": {
     "added": "仓库已添加",
@@ -48,10 +50,12 @@
     "conclusionSaved": "结论已保存",
     "relationCreated": "关系已创建",
     "relationDeleted": "关系已删除",
-    "scanConfirmed": "扫描结论已确认落库"
+    "scanConfirmed": "扫描结论已确认落库",
+    "urlCopied": "仓库地址已复制"
   },
   "errors": {
     "addRepo": "添加仓库失败",
+    "copyUrlFailed": "自动复制失败，请手动复制",
     "deleteRepo": "删除仓库失败",
     "save": "保存失败",
     "create": "创建失败",

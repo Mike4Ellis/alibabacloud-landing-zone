@@ -39,7 +39,9 @@
     "editConclusionButton": "Edit conclusion",
     "deleteRepoLabel": "Delete repository {{name}}",
     "clearBranch": "Clear default branch",
-    "clearDescription": "Clear description"
+    "clearDescription": "Clear description",
+    "copyUrl": "Copy repository URL",
+    "copyUrlLabel": "Copy the Git URL of repository “{{name}}”"
   },
   "feedback": {
     "added": "Repository added",
@@ -48,10 +50,12 @@
     "conclusionSaved": "Conclusion saved",
     "relationCreated": "Relationship created",
     "relationDeleted": "Relationship deleted",
-    "scanConfirmed": "Scan conclusion confirmed and saved"
+    "scanConfirmed": "Scan conclusion confirmed and saved",
+    "urlCopied": "Repository URL copied"
   },
   "errors": {
     "addRepo": "Failed to add repository",
+    "copyUrlFailed": "Automatic copy failed. Please copy manually.",
     "deleteRepo": "Failed to delete repository",
     "save": "Failed to save",
     "create": "Failed to create relationship",

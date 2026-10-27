@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
@@ -8,6 +8,29 @@ import { server } from '@/test/mocks/server';
 import { RepoListPage } from './RepoListPage';
 import { useAuthStore } from '@/shared/auth/store';
 import { message } from 'antd';
+import { copyTextToClipboard } from '@/shared/lib/clipboard';
+
+vi.mock('@/shared/lib/clipboard', () => ({ copyTextToClipboard: vi.fn() }));
+
+const copyMock = vi.mocked(copyTextToClipboard);
+
+const httpUrl = 'https://github.com/Mike4Ellis/alibabacloud-landing-zone.git';
+const sshUrl = 'git@gitlab.example.com:community/auto-wonder.git';
+const longUrl = `https://git.example.com/group/${'a'.repeat(320)}.git`;
+
+function repoRow(id: number, name: string, url: string) {
+  return { id, name, url, defaultBranch: 'main', description: null, scanStatus: 'DONE', version: 1, gmtCreate: '2026-07-01' };
+}
+
+function mockRepoList(data: ReturnType<typeof repoRow>[]) {
+  server.use(http.get('/api/repos', () => HttpResponse.json({
+    success: true, code: '0', message: '', traceId: null, data,
+  })));
+}
+
+function copyButton(name: string) {
+  return screen.findByRole('button', { name: `复制仓库「${name}」的 Git 地址` });
+}
 
 function LocationProbe() {
   const location = useLocation();
@@ -216,5 +239,124 @@ describe('RepoListPage', () => {
     await waitFor(() => expect(deletedId).toBe(42));
     expect(successSpy).toHaveBeenCalledWith('仓库已删除');
     successSpy.mockRestore();
+  });
+});
+
+describe('RepoListPage copy repository URL', () => {
+  beforeEach(() => {
+    copyMock.mockReset();
+  });
+
+  it('renders one copy control per row named after its repository', async () => {
+    mockRepoList([repoRow(1, 'repo-a', httpUrl), repoRow(2, 'repo-b', sshUrl)]);
+    renderPage();
+
+    expect(await copyButton('repo-a')).toBeInTheDocument();
+    expect(await copyButton('repo-b')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /复制仓库「/ })).toHaveLength(2);
+  });
+
+  it('renders no copy control when the list is empty', async () => {
+    mockRepoList([]);
+    renderPage();
+
+    await waitFor(() => expect(document.querySelector('.ant-empty')).not.toBeNull());
+    expect(screen.queryByRole('button', { name: /复制仓库/ })).not.toBeInTheDocument();
+  });
+
+  it('copies the stored URL of each row verbatim, including long and SSH addresses', async () => {
+    const user = userEvent.setup();
+    copyMock.mockResolvedValue(true);
+    mockRepoList([repoRow(1, 'long-repo', longUrl), repoRow(2, 'ssh-repo', sshUrl)]);
+    renderPage();
+
+    await user.click(await copyButton('long-repo'));
+    await waitFor(() => expect(copyMock).toHaveBeenLastCalledWith(longUrl));
+    expect(copyMock.mock.calls[0][0]).toHaveLength(longUrl.length);
+    expect(copyMock.mock.calls[0][0]).toBe(longUrl);
+
+    await user.click(await copyButton('ssh-repo'));
+    await waitFor(() => expect(copyMock).toHaveBeenLastCalledWith(sshUrl));
+    expect(copyMock.mock.calls[1][0]).toBe('git@gitlab.example.com:community/auto-wonder.git');
+  });
+
+  it('waits for the copy result before reporting and shows success only for true', async () => {
+    const user = userEvent.setup();
+    let finish!: (copied: boolean) => void;
+    copyMock.mockImplementation(() => new Promise<boolean>(resolve => { finish = resolve; }));
+    const successSpy = vi.spyOn(message, 'success').mockImplementation(() => undefined as never);
+    const errorSpy = vi.spyOn(message, 'error').mockImplementation(() => undefined as never);
+    mockRepoList([repoRow(1, 'repo-a', httpUrl)]);
+    renderPage();
+
+    await user.click(await copyButton('repo-a'));
+    await waitFor(() => expect(copyMock).toHaveBeenCalledWith(httpUrl));
+    expect(successSpy).not.toHaveBeenCalled();
+    expect(errorSpy).not.toHaveBeenCalled();
+
+    finish(true);
+    await waitFor(() => expect(successSpy).toHaveBeenCalledWith('仓库地址已复制'));
+    expect(errorSpy).not.toHaveBeenCalled();
+    successSpy.mockRestore();
+    errorSpy.mockRestore();
+  });
+
+  it('reports failure and no success when the copy falls back unsuccessfully', async () => {
+    const user = userEvent.setup();
+    copyMock.mockResolvedValue(false);
+    const successSpy = vi.spyOn(message, 'success').mockImplementation(() => undefined as never);
+    const errorSpy = vi.spyOn(message, 'error').mockImplementation(() => undefined as never);
+    mockRepoList([repoRow(1, 'repo-a', httpUrl)]);
+    renderPage();
+
+    await user.click(await copyButton('repo-a'));
+
+    await waitFor(() => expect(errorSpy).toHaveBeenCalledWith('自动复制失败，请手动复制'));
+    expect(successSpy).not.toHaveBeenCalled();
+    successSpy.mockRestore();
+    errorSpy.mockRestore();
+  });
+
+  it('copies for read-only members without any write request', async () => {
+    const user = userEvent.setup();
+    copyMock.mockResolvedValue(true);
+    let writeRequests = 0;
+    server.use(
+      http.get('/api/repos', () => HttpResponse.json({
+        success: true, code: '0', message: '', traceId: null, data: [repoRow(1, 'repo-a', httpUrl)],
+      })),
+      http.post('/api/repos', () => { writeRequests += 1; return HttpResponse.json({ success: true, code: '0', message: '', traceId: null, data: null }); }),
+      http.put('/api/repos/:id', () => { writeRequests += 1; return HttpResponse.json({ success: true, code: '0', message: '', traceId: null, data: null }); }),
+      http.patch('/api/repos/:id', () => { writeRequests += 1; return HttpResponse.json({ success: true, code: '0', message: '', traceId: null, data: null }); }),
+      http.delete('/api/repos/:id', () => { writeRequests += 1; return HttpResponse.json({ success: true, code: '0', message: '', traceId: null, data: null }); }),
+    );
+    renderPage('READ_ONLY');
+
+    const button = await copyButton('repo-a');
+    expect(button).toBeEnabled();
+    await user.click(button);
+
+    await waitFor(() => expect(copyMock).toHaveBeenCalledWith(httpUrl));
+    expect(writeRequests).toBe(0);
+  });
+
+  it('is keyboard operable with Tab, Enter and Space', async () => {
+    const user = userEvent.setup();
+    copyMock.mockResolvedValue(true);
+    mockRepoList([repoRow(1, 'repo-a', httpUrl)]);
+    renderPage();
+
+    const button = await copyButton('repo-a');
+    for (let presses = 0; presses < 10 && document.activeElement !== button; presses += 1) {
+      await user.tab();
+    }
+    expect(button).toHaveFocus();
+
+    await user.keyboard('{Enter}');
+    await waitFor(() => expect(copyMock).toHaveBeenCalledTimes(1));
+    expect(copyMock).toHaveBeenLastCalledWith(httpUrl);
+
+    await user.keyboard(' ');
+    await waitFor(() => expect(copyMock).toHaveBeenCalledTimes(2));
   });
 });
